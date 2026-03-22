@@ -10,7 +10,8 @@ ESP32 → Signal processing & communication
 The system provides real-time monitoring and visualization of multiple health parameters on both an OLED display and a PC.
 
 **System Architecture**
-![Uploading ChatGPT Image Mar 22, 2026, 09_04_22 PM.png…]()
+<img width="1536" height="1024" alt="ChatGPT Image Mar 22, 2026, 09_04_22 PM" src="https://github.com/user-attachments/assets/1c9ca2b3-96eb-4780-88ea-aafde44f70dd" />
+
 
 
 **Hardware Components**
