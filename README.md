@@ -33,6 +33,7 @@ DS18B20 Sensor
 
 SSD1306 OLED Display
 
+
 **Software & Tools**
 
 STM32CubeIDE
@@ -40,6 +41,8 @@ STM32CubeIDE
 Arduino IDE
 
 Python (Matplotlib)
+
+
 
 **Features**
 
@@ -57,6 +60,7 @@ Dual-microcontroller architecture
 
 Serial/Bluetooth data transmission
 
+
 **Results**
 
 Stable ECG waveform obtained
@@ -67,6 +71,7 @@ Real-time multi-parameter monitoring
 
 Smooth data visualization
 
+
 **Limitations**
 
 Not medical-grade
@@ -74,6 +79,7 @@ Not medical-grade
 Sensitive to motion artifacts
 
 Requires proper sensor placement
+
 
 **Future Scope**
 
@@ -87,6 +93,7 @@ Improved signal filtering
 
 Portable version
 
+
 **Authors**
 
 Sudipon Makal
@@ -96,6 +103,7 @@ Tushar Ranjan Dash
 Tushit Kumar
 
 Soubhagya Mishra
+
 
 **License**
 
