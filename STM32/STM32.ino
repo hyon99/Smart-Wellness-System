@@ -6,8 +6,7 @@
 // ---------------- OLED ----------------
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // ---------------- AD8232 ----------------
 #define ECG_PIN   PA0
@@ -25,7 +24,7 @@ DHT dht(DHTPIN, DHTTYPE);
 
 // ---------------- Variables ----------------
 int xPos = 0;
-int prevY = 44;   // start mid graph
+int prevY = 44;
 float temperature = 0;
 float humidity = 0;
 float bodyTemp = 0;
@@ -33,12 +32,20 @@ float bodyTemp = 0;
 unsigned long lastDHTRead = 0;
 unsigned long lastDSRead = 0;
 
-// --------- ESP32 Data ----------
-int heartRate = 0;
+// -------- ECG HR VARIABLES --------
+long lastBeatTime = 0;
+bool beatDetected = false;
+int ecgHR = 0;
+
+// smoothing + dynamic threshold
+int prevECG = 0;
+int maxVal = 0;
+
+// -------- ESP32 Data --------
 int spo2 = 0;
 String serialBuffer = "";
 
-// ================= DS18B20 FUNCTIONS =================
+// ================= DS18B20 =================
 void DS_setOutput() { pinMode(DS_PIN, OUTPUT); }
 void DS_setInput() { pinMode(DS_PIN, INPUT); }
 
@@ -115,7 +122,7 @@ float DS_getTemp()
   return temp / 16.0;
 }
 
-// ================= UART Parser =================
+// ================= UART =================
 void readESP32()
 {
   while (Serial1.available())
@@ -124,20 +131,11 @@ void readESP32()
 
     if (c == '>')
     {
-      int hrIndex = serialBuffer.indexOf("HR:");
       int spIndex = serialBuffer.indexOf("SPO2:");
 
-      if (hrIndex >= 0 && spIndex >= 0)
-      {
-        heartRate = serialBuffer.substring(
-                      hrIndex + 3,
-                      serialBuffer.indexOf(',', hrIndex)
-                    ).toInt();
+      if (spIndex >= 0)
+        spo2 = serialBuffer.substring(spIndex + 5).toInt();
 
-        spo2 = serialBuffer.substring(
-                 spIndex + 5
-               ).toInt();
-      }
       serialBuffer = "";
     }
     else if (c != '<')
@@ -156,7 +154,7 @@ void setup()
   digitalWrite(SDN_PIN, HIGH);
 
   dht.begin();
-  Wire.begin();
+  Wire.begin(PB7, PB6);
 
   Serial.begin(115200);
   Serial1.begin(115200);
@@ -171,6 +169,7 @@ void loop()
 {
   readESP32();
 
+  // -------- DHT --------
   if (millis() - lastDHTRead > 2000)
   {
     float t = dht.readTemperature();
@@ -184,6 +183,7 @@ void loop()
     lastDHTRead = millis();
   }
 
+  // -------- DS18B20 --------
   if (millis() - lastDSRead > 1000)
   {
     float t = DS_getTemp();
@@ -195,10 +195,7 @@ void loop()
 
   float bodyTempF = (bodyTemp * 9.0 / 5.0) + 32.0;
 
-  // -------- CLEAR FULL DISPLAY --------
   display.clearDisplay();
-
-  // -------- TEXT AREA (0–25 px) --------
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
@@ -219,14 +216,14 @@ void loop()
 
   display.setCursor(64, 10);
   display.print("HR:");
-  display.print(heartRate);
+  display.print(ecgHR);
 
   display.setCursor(64, 18);
   display.print("SpO2:");
   display.print(spo2);
   display.print("%");
 
-  // -------- ECG GRAPH AREA (26–63 px) --------
+  // -------- ECG --------
   if (digitalRead(LO_PLUS) == 1 || digitalRead(LO_MINUS) == 1)
   {
     display.setCursor(30, 40);
@@ -236,10 +233,37 @@ void loop()
   }
 
   int ecgValue = analogRead(ECG_PIN);
-  Serial1.println(ecgValue);
-  Serial.println(ecgValue);
 
-  int y = map(ecgValue, 0, 4095, 63, 26);
+  // smoothing
+  int smooth = (ecgValue + prevECG) / 2;
+  prevECG = ecgValue;
+
+  // dynamic max tracking
+  if (smooth > maxVal) maxVal = smooth;
+  int threshold = maxVal * 0.6;
+
+  // R-peak detection
+  if (smooth > threshold && !beatDetected)
+  {
+    long currentTime = millis();
+    long rr = currentTime - lastBeatTime;
+
+    if (rr > 300 && rr < 2000)
+    {
+      ecgHR = 60000 / rr;
+    }
+
+    lastBeatTime = currentTime;
+    beatDetected = true;
+  }
+
+  if (smooth < threshold)
+  {
+    beatDetected = false;
+  }
+
+  // -------- GRAPH --------
+  int y = map(smooth, 0, 4095, 63, 26);
 
   display.drawLine(xPos - 1, prevY, xPos, y, SSD1306_WHITE);
 
